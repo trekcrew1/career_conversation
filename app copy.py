@@ -12,24 +12,36 @@ load_dotenv(override=True)
 openai_api_key = os.getenv("openai_api_key")
 openai = OpenAI(api_key=openai_api_key)
 
-# # For pushover
-# pushover_user = os.getenv("PUSHOVER_USER")
-# pushover_token = os.getenv("PUSHOVER_TOKEN")
-# pushover_url = "https://api.pushover.net/1/messages.json"
+# For pushover
+pushover_user = os.getenv("PUSHOVER_USER")
+pushover_token = os.getenv("PUSHOVER_TOKEN")
+pushover_url = os.getenv("PUSHOVER_URL")
 
-# if pushover_user:
-#     print(f"Pushover user found and starts with {pushover_user[0]}")
-# else:
-#     print("Pushover user not found")
+if pushover_user:
+    print(f"Pushover user found and starts with {pushover_user[0]}")
+else:
+    print("Pushover user not found")
 
-# if pushover_token:
-#     print(f"Pushover token found and starts with {pushover_token[0]}")
-# else:
-#     print("Pushover token not found")
+if pushover_token:
+    print(f"Pushover token found and starts with {pushover_token[0]}")
+else:
+    print("Pushover token not found")
 
+
+def push(message):
+    # print(f"Push: {message}")
+    payload = {"user": pushover_user, "token": pushover_token, "message": message}
+    requests.post(pushover_url, data=payload)
+
+def record_user_details(email, name="Name not provided", notes="not provided"):
+    push(f"Recording interest from {name} with email {email} and notes {notes}")
+    return {"recorded": "ok"}
+
+def record_unknown_question(question):
+    push(f"Recording {question} asked that I couldn't answer")
+    return {"recorded": "ok"}
 
 # This is a more elegant way that avoids the IF statement.
-
 record_user_details_json = {
     "name": "record_user_details",
     "description": "Use this tool to record that a user is interested in being in touch and provided an email address",
@@ -74,6 +86,7 @@ record_unknown_question_json = {
 tools = [{"type": "function", "function": record_user_details_json},
         {"type": "function", "function": record_unknown_question_json}]
 
+# This function can take a list of tool calls, and run them. This is the IF statement!!
 def handle_tool_calls(tool_calls):
     results = []
     for tool_call in tool_calls:
@@ -84,6 +97,9 @@ def handle_tool_calls(tool_calls):
         result = tool(**arguments) if tool else {}
         results.append({"role": "tool","content": json.dumps(result),"tool_call_id": tool_call.id})
     return results
+
+
+# globals()["record_unknown_question"]("this is a really hard question")
 
 reader = PdfReader("personal_info/linkedin_profile.pdf")
 linkedin = ""
@@ -102,17 +118,23 @@ particularly questions related to {name}'s career, background, skills and experi
 Your responsibility is to represent {name} for interactions on the website as faithfully as possible. \
 You are given a summary of {name}'s background and LinkedIn profile which you can use to answer questions. \
 Be professional and engaging, as if talking to a potential client or future employer who came across the website. \
-If you don't know the answer to any question, use your record_unknown_question tool to record the question that you couldn't answer, even if it's about something trivial or unrelated to career. \
-If the user is engaging in discussion, try to steer them towards getting in touch via email; ask for their email and record it using your record_user_details tool. "
+If you don't know the answer to any question, use your record_unknown_question tool to record the question that \
+you couldn't answer, even if it's about something trivial or unrelated to career. \
+If the user is engaging in discussion, try to steer them towards getting in touch via email; ask for their email \
+and record it using your record_user_details tool. "
 
 # Additional instruction: aggregate multiple roles at the same employer
 system_prompt += (
-    "\n\nIMPORTANT: When answering questions about employment, current job, or tenure, treat multiple roles at the same employer as a combined employment history. "
-    "Identify all roles listed for that employer in the provided profile. For each role, state the job title, start and end dates (or 'Present' if currently held), and the duration in years and months. "
-    "Compute and state the total combined tenure at that employer by summing durations across all roles and avoiding double-counting overlapping time (if dates overlap, compute the union of intervals). "
-    "If dates are missing or ambiguous, mark any values you estimate as 'estimated' and explain briefly. "
-    "When the user asks about the 'current job', list the current role(s) first (those with end date 'Present') and then provide a concise company-level summary that includes total time at the company and a role-by-role breakdown. "
-    "Example format: \"Rocket Mortgage — Total 9 years 8 months (Data Engineer, Mar 2023–Present — 2 yr 7 mo; Software Engineer, Feb 2016–Mar 2023 — 7 yr 2 mo)\"."
+    f"\n\nIMPORTANT: When answering questions about employment, current job, or tenure, treat multiple roles \
+    at the same employer as a combined employment history. Identify all roles listed for that employer in the provided \
+    profile. For each role, state the job title, start and end dates (or 'Present' if currently held), and the duration in years and months. \
+    Compute and state the total combined tenure at that employer by summing durations across all roles and avoiding \
+    double-counting overlapping time (if dates overlap, compute the union of intervals). \
+    If dates are missing or ambiguous, mark any values you estimate as 'estimated' and explain briefly. \
+    When the user asks about the 'current job', list the current role(s) first (those with end date 'Present') and then \
+    provide a concise company-level summary that includes total time at the company and a role-by-role breakdown. \
+    Example format: \"Rocket Mortgage — Total 9 years 8 months (Data Engineer, Mar 2023-Present — 2 yr 7 mo; Software \
+    Engineer, Feb 2016-Mar 2023 — 7 yr 2 mo)\"."
 )
 
 system_prompt += f"\n\n## Summary:\n{summary}\n\n## LinkedIn Profile:\n{linkedin}\n\n"
@@ -141,4 +163,5 @@ def chat(message, history):
     return response.choices[0].message.content
 
 
-gr.ChatInterface(chat, type="messages").launch()
+if __name__ == "__main__":
+    gr.ChatInterface(chat, type="messages").launch()

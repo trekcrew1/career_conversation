@@ -9,7 +9,7 @@ except Exception:
     except Exception:
         HfHubHTTPError = Exception  # ultimate fallback: still catches API errors
 
-SPACE = "4robmorrow/career_digital_twin"
+SPACE = "4robmorrow/career_conversation"
 api = HfApi()
 
 print(f"Target Space: {SPACE}")
