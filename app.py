@@ -162,22 +162,22 @@ def chat(message, history):
 #     description="Ask Robert about his background, projects, and experience."
 # )
 
-theme = gr.themes.Soft(
-    primary_hue="indigo",      # accent color
-    secondary_hue="violet",
-    neutral_hue="slate",
-    font=[gr.themes.GoogleFont("Inter"), "ui-sans-serif"]
-).set(
-    body_background_fill="#0b1220",    # deep background
-    block_background_fill="#0f172a",
-    body_text_color="#e5e7eb",
-    link_text_color="#93c5fd",
-    # radius_size="12px",
-    shadow_spread="2px",
-)
-demo = gr.ChatInterface(chat, type="messages", theme=theme,
-                        title="Career Conversation",
-                        description="Ask Robert about his background, projects, and experience.")
+# theme = gr.themes.Soft(
+#     primary_hue="indigo",      # accent color
+#     secondary_hue="violet",
+#     neutral_hue="slate",
+#     font=[gr.themes.GoogleFont("Inter"), "ui-sans-serif"]
+# ).set(
+#     body_background_fill="#0b1220",    # deep background
+#     block_background_fill="#0f172a",
+#     body_text_color="#e5e7eb",
+#     link_text_color="#93c5fd",
+#     # radius_size="12px",
+#     shadow_spread="2px",
+# )
+# demo = gr.ChatInterface(chat, type="messages", theme=theme,
+#                         title="Career Conversation",
+#                         description="Ask Robert about his background, projects, and experience.")
 
 # chatbot = gr.Chatbot(
 #     type="messages",
@@ -190,6 +190,83 @@ demo = gr.ChatInterface(chat, type="messages", theme=theme,
 #                         title="Career Conversation",
 #                         description="Ask Robert about his background, projects, and experience.",
 #                         theme="freddyaboulton/dracula_revamped")
+
+
+# 1) Higher-contrast light theme with modern fonts & accents
+theme = gr.themes.Soft(
+    primary_hue="indigo",      # buttons/links/accent
+    secondary_hue="emerald",   # secondary accent
+    neutral_hue="slate",       # text & borders
+    font=[gr.themes.GoogleFont("Inter"), "ui-sans-serif"],
+    font_mono=[gr.themes.GoogleFont("Fira Code"), "ui-monospace"]
+)
+
+# 2) A few tasteful CSS tweaks for pop and readability (still light)
+css = """
+/* Max width, centered layout */
+.gradio-container { max-width: 980px; margin: 0 auto; }
+
+/* Subtle light background and card elevation */
+body { background: linear-gradient(180deg, #f8fafc 0%, #ffffff 60%); }
+.gr-box, .gr-panel, .gr-card, .gr-form, .gr-column, .gr-group {
+  background: #ffffff !important;
+  border: 1px solid #e5e7eb !important;         /* slate-200 */
+  box-shadow: 0 10px 30px rgba(2, 6, 23, 0.06);  /* soft elevation */
+  border-radius: 12px !important;
+}
+
+/* Buttons: bold primary + subtle hover lift */
+button.gr-button {
+  font-weight: 600;
+  border-radius: 10px !important;
+}
+button.gr-button.primary {
+  background: #4f46e5 !important;   /* indigo-600 */
+  border-color: #4f46e5 !important;
+  color: white !important;
+}
+button.gr-button.primary:hover { filter: brightness(1.06); transform: translateY(-1px); }
+
+/* Inputs: slightly larger & rounded */
+textarea, input, .gr-textbox, .gr-text-input { 
+  border-radius: 10px !important;
+}
+
+/* Chat area: crisp bubbles with gentle color cues */
+.chatbot, .gr-chatbot { background: #ffffff !important; }
+.chatbot .message.user, .gr-chatbot .message.user {
+  background: #eef2ff !important;    /* indigo-50 */
+  border: 1px solid #c7d2fe !important; /* indigo-200 */
+}
+.chatbot .message.bot, .gr-chatbot .message.bot {
+  background: #ecfeff !important;    /* cyan-50 */
+  border: 1px solid #a5f3fc !important; /* cyan-200 */
+}
+
+/* Links: visible but not shouting */
+a { color: #2563eb; }                 /* blue-600 */
+a:hover { color: #1d4ed8; }
+"""
+
+# 3) Chatbot config (narrower bubbles feel more "app-like")
+chatbot = gr.Chatbot(
+    type="messages",
+    height=640,
+    bubble_full_width=False,
+    show_copy_button=True
+)
+
+# 4) Final app object for Spaces (replace your existing demo=... line with this)
+demo = gr.ChatInterface(
+    chat,
+    chatbot=chatbot,
+    theme=theme,
+    css=css,
+    title="Career Conversation",
+    description="Chat with Robert about his background, projects, and experience."
+)
+
+
 
 if __name__ == "__main__":
     demo.launch()
