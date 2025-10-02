@@ -154,7 +154,8 @@ def chat(message, history):
             return choice.message.content
 
 # Expose top-level Gradio app for Spaces
-demo = gr.ChatInterface(chat, type="messages")
+theme = gr.themes.Monochrome()   
+demo = gr.ChatInterface(chat, type="messages", theme=theme)
 
 if __name__ == "__main__":
     demo.launch()
