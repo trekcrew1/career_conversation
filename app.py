@@ -172,7 +172,7 @@ theme = gr.themes.Soft(
     block_background_fill="#0f172a",
     body_text_color="#e5e7eb",
     link_text_color="#93c5fd",
-    radius_size="12px",
+    # radius_size="12px",
     shadow_spread="2px",
 )
 demo = gr.ChatInterface(chat, type="messages", theme=theme,
