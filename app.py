@@ -157,4 +157,4 @@ def chat(message, history):
 demo = gr.ChatInterface(chat, type="messages")
 
 if __name__ == "__main__":
-    demo.launch(share=True)
+    demo.launch()
