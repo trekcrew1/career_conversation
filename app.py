@@ -192,79 +192,150 @@ def chat(message, history):
 #                         theme="freddyaboulton/dracula_revamped")
 
 
-# 1) Higher-contrast light theme with modern fonts & accents
+import gradio as gr
+
+# --- Palette (tweak these 3 to taste) ---
+G1 = "#2563EB"   # royal blue
+G2 = "#06B6D4"   # cyan
+TEXT_DARK = "#0F172A"  # slate-900
+
+# 1) Theme: light, higher contrast
 theme = gr.themes.Soft(
-    primary_hue="indigo",      # buttons/links/accent
-    secondary_hue="emerald",   # secondary accent
-    neutral_hue="slate",       # text & borders
+    primary_hue="indigo",
+    secondary_hue="cyan",
+    neutral_hue="slate",
     font=[gr.themes.GoogleFont("Inter"), "ui-sans-serif"],
-    font_mono=[gr.themes.GoogleFont("Fira Code"), "ui-monospace"]
+    font_mono=[gr.themes.GoogleFont("Fira Code"), "ui-monospace"],
 )
 
-# 2) A few tasteful CSS tweaks for pop and readability (still light)
-css = """
-/* Max width, centered layout */
-.gradio-container { max-width: 980px; margin: 0 auto; }
-
-/* Subtle light background and card elevation */
-body { background: linear-gradient(180deg, #f8fafc 0%, #ffffff 60%); }
-.gr-box, .gr-panel, .gr-card, .gr-form, .gr-column, .gr-group {
-  background: #ffffff !important;
-  border: 1px solid #e5e7eb !important;         /* slate-200 */
-  box-shadow: 0 10px 30px rgba(2, 6, 23, 0.06);  /* soft elevation */
-  border-radius: 12px !important;
-}
-
-/* Buttons: bold primary + subtle hover lift */
-button.gr-button {
-  font-weight: 600;
-  border-radius: 10px !important;
-}
-button.gr-button.primary {
-  background: #4f46e5 !important;   /* indigo-600 */
-  border-color: #4f46e5 !important;
-  color: white !important;
-}
-button.gr-button.primary:hover { filter: brightness(1.06); transform: translateY(-1px); }
-
-/* Inputs: slightly larger & rounded */
-textarea, input, .gr-textbox, .gr-text-input { 
-  border-radius: 10px !important;
-}
-
-/* Chat area: crisp bubbles with gentle color cues */
-.chatbot, .gr-chatbot { background: #ffffff !important; }
-.chatbot .message.user, .gr-chatbot .message.user {
-  background: #eef2ff !important;    /* indigo-50 */
-  border: 1px solid #c7d2fe !important; /* indigo-200 */
-}
-.chatbot .message.bot, .gr-chatbot .message.bot {
-  background: #ecfeff !important;    /* cyan-50 */
-  border: 1px solid #a5f3fc !important; /* cyan-200 */
-}
-
-/* Links: visible but not shouting */
-a { color: #2563eb; }                 /* blue-600 */
-a:hover { color: #1d4ed8; }
+# 2) Header markup (gradient bar with title/subtitle)
+header_html = f"""
+<div class="hero">
+  <div class="hero-left">
+    <div class="hero-avatar"></div>
+    <div class="hero-text">
+      <div class="hero-title">Chat with Robert</div>
+      <div class="hero-subtitle">We typically reply in a few minutes.</div>
+    </div>
+  </div>
+</div>
 """
 
-# 3) Chatbot config (narrower bubbles feel more "app-like")
+# 3) CSS: gradient frame, header, bubbles, inputs, buttons
+css = f"""
+:root {{
+  --g1: {G1};
+  --g2: {G2};
+  --text-dark: {TEXT_DARK};
+}}
+
+body {{
+  background: #f3f6fb;
+}}
+
+#chat-shell {{
+  position: relative;
+  max-width: 760px;
+  margin: 32px auto;
+  padding: 2px;                          /* gradient "frame" thickness */
+  border-radius: 18px;
+  background: linear-gradient(135deg, var(--g1), var(--g2));
+  box-shadow: 0 20px 50px rgba(2, 6, 23, 0.14);
+}}
+
+#chat-inner {{
+  background: #ffffff;
+  border-radius: 16px;
+  overflow: hidden;
+}}
+
+.hero {{
+  background: linear-gradient(135deg, var(--g1), var(--g2));
+  color: #fff;
+  padding: 16px 18px;
+}}
+.hero-left {{ display:flex; align-items:center; gap:12px; }}
+.hero-avatar {{
+  width: 44px; height: 44px; border-radius: 50%;
+  background: radial-gradient(ellipse at 30% 30%, #ffffff 0%, #dbeafe 35%, transparent 60%),
+              linear-gradient(135deg, #60a5fa, #38bdf8);
+  box-shadow: 0 6px 14px rgba(0,0,0,.18), inset 0 0 0 2px rgba(255,255,255,.35);
+}}
+.hero-title {{ font-weight: 700; font-size: 18px; line-height: 1.2; }}
+.hero-subtitle {{ opacity: .9; font-size: 13px; }}
+
+#ci {{                             /* ChatInterface root */
+  background: #fff;
+  border-radius: 0 0 16px 16px;
+  padding: 8px 10px 12px;
+}
+
+/* Chat area */
+#ci .gr-chatbot, #ci .chatbot {{ background:#ffffff; }}
+#ci .message.bot {{
+  background: #eef2f7 !important;     /* soft light bubble */
+  color: var(--text-dark);
+  border: 1px solid #e5e7eb !important;
+  border-radius: 14px !important;
+}}
+#ci .message.user {{
+  background: linear-gradient(135deg, var(--g1), var(--g2)) !important;
+  color: #ffffff !important;
+  border: none !important;
+  border-radius: 14px !important;
+  box-shadow: 0 6px 16px rgba(37,99,235,.25);
+}}
+#ci .gr-chatbot {{ padding: 12px; }}
+#ci .gr-chatbot, #ci .chatbot {{
+  filter: saturate(1.05) contrast(1.03);
+}}
+
+/* Inputs & buttons */
+#ci textarea, #ci input, #ci .gr-textbox {{
+  border-radius: 12px !important;
+  border: 1px solid #dbe2ea !important;
+}}
+#ci button.gr-button.primary {{
+  background: linear-gradient(135deg, var(--g1), var(--g2)) !important;
+  border: 0 !important;
+  color: #fff !important;
+  font-weight: 700;
+  border-radius: 12px !important;
+  box-shadow: 0 8px 18px rgba(37,99,235,.25);
+}}
+#ci button.gr-button.primary:hover {{
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+}}
+#ci button.gr-button {{
+  border-radius: 12px !important;
+}}
+
+/* Keep layout tidy on wide screens */
+.gradio-container {{ padding: 12px; }}
+"""
+
+# 4) Chatbot config: narrower bubbles, taller area
 chatbot = gr.Chatbot(
     type="messages",
-    height=640,
+    height=580,
     bubble_full_width=False,
-    show_copy_button=True
+    show_copy_button=True,
 )
 
-# 4) Final app object for Spaces (replace your existing demo=... line with this)
-demo = gr.ChatInterface(
-    chat,
-    chatbot=chatbot,
-    theme=theme,
-    css=css,
-    title="Career Conversation",
-    description="Chat with Robert about his background, projects, and experience."
-)
+# 5) Compose the UI: gradient frame -> white inner -> header + chat
+with gr.Blocks(theme=theme, css=css) as demo:
+    with gr.Group(elem_id="chat-shell"):
+        with gr.Column(elem_id="chat-inner"):
+            gr.HTML(header_html, elem_id="hero")
+            gr.ChatInterface(
+                chat,
+                chatbot=chatbot,
+                title=None,
+                description=None,
+                elem_id="ci",
+            )
+
 
 
 
