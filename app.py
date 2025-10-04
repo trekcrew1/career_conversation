@@ -154,43 +154,7 @@ def chat(message, history):
         else:
             return choice.message.content
 
-# Expose top-level Gradio app for Spaces
-# demo = gr.ChatInterface(
-#     chat,
-#     type="messages",
-#     theme="freddyaboulton/dracula_revamped",  # high-contrast dark
-#     title="Career Conversation",
-#     description="Ask Robert about his background, projects, and experience."
-# )
 
-# theme = gr.themes.Soft(
-#     primary_hue="indigo",      # accent color
-#     secondary_hue="violet",
-#     neutral_hue="slate",
-#     font=[gr.themes.GoogleFont("Inter"), "ui-sans-serif"]
-# ).set(
-#     body_background_fill="#0b1220",    # deep background
-#     block_background_fill="#0f172a",
-#     body_text_color="#e5e7eb",
-#     link_text_color="#93c5fd",
-#     # radius_size="12px",
-#     shadow_spread="2px",
-# )
-# demo = gr.ChatInterface(chat, type="messages", theme=theme,
-#                         title="Career Conversation",
-#                         description="Ask Robert about his background, projects, and experience.")
-
-# chatbot = gr.Chatbot(
-#     type="messages",
-#     height=640,
-#     bubble_full_width=False,         # narrower bubbles feel more “app-like”
-#     show_copy_button=True,
-#     avatar_images=(None, None)       # or ("assets/user.png", "assets/bot.png")
-# )
-# demo = gr.ChatInterface(chat, chatbot=chatbot,
-#                         title="Career Conversation",
-#                         description="Ask Robert about his background, projects, and experience.",
-#                         theme="freddyaboulton/dracula_revamped")
 
 
 # --- Palette ---
@@ -198,7 +162,7 @@ G1 = "#2563EB"        # royal blue
 G2 = "#06B6D4"        # cyan
 TEXT_DARK = "#0F172A" # slate-900
 
-# Light, modern base theme
+# Light, modern theme
 theme = gr.themes.Soft(
     primary_hue="indigo",
     secondary_hue="cyan",
@@ -220,7 +184,7 @@ header_html = """
 </div>
 """
 
-# CSS via Template (no f-string, normal braces allowed)
+# CSS via Template so normal braces don't break Python
 _css_tpl = Template(r"""
 :root {
   --g1: $G1;
@@ -261,7 +225,7 @@ body { background: #f3f6fb; }
 .hero-title { font-weight: 700; font-size: 18px; line-height: 1.2; }
 .hero-subtitle { opacity: .9; font-size: 13px; }
 
-#ci {                             /* ChatInterface root */
+#ci {                             /* wrapper around ChatInterface */
   background: #fff;
   border-radius: 0 0 16px 16px;
   padding: 8px 10px 12px;
@@ -313,11 +277,10 @@ body { background: #f3f6fb; }
 """)
 css = _css_tpl.substitute(G1=G1, G2=G2, TEXT_DARK=TEXT_DARK)
 
-# Narrower bubbles, taller area
+# Chatbot (remove deprecated bubble_full_width)
 chatbot = gr.Chatbot(
     type="messages",
     height=580,
-    bubble_full_width=False,
     show_copy_button=True,
 )
 
@@ -326,14 +289,14 @@ with gr.Blocks(theme=theme, css=css) as demo:
     with gr.Group(elem_id="chat-shell"):
         with gr.Column(elem_id="chat-inner"):
             gr.HTML(header_html, elem_id="hero")
-            gr.ChatInterface(
-                chat,
-                chatbot=chatbot,
-                title=None,
-                description=None,
-                elem_id="ci",
-            )
-
+            # Give the wrapper the elem_id so CSS can target it
+            with gr.Group(elem_id="ci"):
+                gr.ChatInterface(
+                    chat,
+                    chatbot=chatbot,
+                    title=None,
+                    description=None,
+                )
 
 
 if __name__ == "__main__":
