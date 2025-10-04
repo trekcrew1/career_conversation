@@ -24,7 +24,7 @@ def _get_openai_key():
 
 OPENAI_API_KEY = _get_openai_key()
 
-# Looking/not-looking flag (default True = actively looking)
+# Looking/not-looking flag (default False here per your last code)
 def _get_bool(name: str, default: bool = True) -> bool:
     raw = os.getenv(name)
     if raw is None:
@@ -62,10 +62,7 @@ def generate_polite_decline(user_text: str) -> str:
         )
         messages = [
             {"role": "system", "content": system},
-            {
-                "role": "user",
-                "content": f"Compose the reply to this inbound message:\n\n{user_text}",
-            },
+            {"role": "user", "content": f"Compose the reply to this inbound message:\n\n{user_text}"},
         ]
         resp = client.chat.completions.create(
             model="gpt-4o-mini",
@@ -245,7 +242,7 @@ def chat(message, history):
     # If not looking and the inbound reads like a job/offer, produce a tailored decline
     if not LOOKING_FOR_ROLE and _looks_like_job_pitch(message):
         return generate_polite_decline(message)
-    
+
     messages = [{"role": "system", "content": system_prompt}] + history + [{"role": "user", "content": message}]
     while True:
         try:
@@ -299,25 +296,7 @@ theme = gr.themes.Soft(
     font_mono=[gr.themes.GoogleFont("Fira Code"), "ui-monospace"],
 )
 
-# Header markup (includes availability badge)
-# header_html = f"""
-# <div class="hero">
-#   <div class="hero-left">
-#     <div class="hero-avatar"></div>
-#     <div class="hero-text">
-#       <div class="hero-title">Chat with Robert's profile AI</div>
-#       <!--<div class="hero-subtitle">I can respond and answer most of the questions you may have.</div>-->
-#       <div class="notice">
-#         <span class="dot"></span>
-#         <span class="text"><i>I’m an AI version of Robert. I’m still learning and may be wrong sometimes—please verify important info.</i></span>
-#       </div>
-#     </div>
-#   </div>
-#   <div class="hero-badge">{BADGE_TEXT}</div>
-# </div>
-# """
-
-
+# Header markup (includes availability badge + notice)
 header_html = f"""
 <div class="hero">
   <div class="hero-left">
@@ -336,7 +315,6 @@ header_html = f"""
 </div>
 """
 
-
 # CSS via Template so normal braces don't break Python
 _css_tpl = Template(r"""
 :root {
@@ -346,8 +324,12 @@ _css_tpl = Template(r"""
   --badge-bg: $BADGE_BG;
   --badge-color: $BADGE_COLOR;
   --badge-shadow: $BADGE_SHADOW;
+
+  /* Force readable defaults for text variables some themes rely on */
+  --body-text-color: var(--text-dark);
 }
-body { background: #f3f6fb; }
+html, body { background: #f3f6fb; color: var(--text-dark); }
+
 #chat-shell {
   position: relative;
   max-width: 760px;
@@ -381,7 +363,7 @@ body { background: #f3f6fb; }
 .hero-subtitle { opacity: .9; font-size: 13px; }
 .hero-badge {
   position: absolute;
-  top: 10px;                                  /* 5px from the top edge */
+  top: 5px;                                  /* 5px from the top edge */
   right: 5px;                                /* 5px from the right edge */
   z-index: 1;
 
@@ -391,19 +373,41 @@ body { background: #f3f6fb; }
   box-shadow: var(--badge-shadow);
   white-space: nowrap;
 }
-#ci {                             /* wrapper around ChatInterface */
+
+/* Ensure wrapper uses dark text by default */
+#ci {
   background: #fff;
   border-radius: 0 0 16px 16px;
   padding: 8px 10px 12px;
+  color: var(--text-dark);
 }
+
 /* Chat area */
 #ci .gr-chatbot, #ci .chatbot { background:#ffffff; }
+
+/* ---- MOBILE SAFETY: Always force readable colors for bot messages ---- */
 #ci .message.bot {
   background: #eef2f7 !important;     /* soft light bubble */
-  color: var(--text-dark);
+  color: var(--text-dark) !important;
   border: 1px solid #e5e7eb !important;
   border-radius: 14px !important;
 }
+#ci .message.bot *,                     /* children inherit readable color */
+#ci .message.bot .prose,
+#ci .message.bot .prose * ,
+#ci .message.bot .markdown-body,
+#ci .message.bot .markdown-body * {
+  color: var(--text-dark) !important;
+}
+#ci .message.bot a { color: #1d4ed8 !important; }
+#ci .message.bot code, #ci .message.bot pre {
+  background: #f1f5f9 !important;      /* slate-100 */
+  color: #111827 !important;           /* gray-900 */
+  border-radius: 6px;
+  padding: 0.1rem 0.3rem;
+}
+
+/* User bubble remains high contrast */
 #ci .message.user {
   background: linear-gradient(135deg, var(--g1), var(--g2)) !important;
   color: #ffffff !important;
@@ -411,10 +415,13 @@ body { background: #f3f6fb; }
   border-radius: 14px !important;
   box-shadow: 0 6px 16px rgba(37,99,235,.25);
 }
+
+/* Padding & slight global contrast bump */
 #ci .gr-chatbot { padding: 12px; }
 #ci .gr-chatbot, #ci .chatbot {
   filter: saturate(1.05) contrast(1.03);
 }
+
 /* ===== Input row: clearer box + prominent send arrow ===== */
 /* Textbox shell */
 #ci .gr-textbox {
@@ -445,6 +452,7 @@ body { background: #f3f6fb; }
 }
 /* Layout: keep the input row tight */
 #ci .gr-form, #ci .gradio-row { gap: 10px; }
+
 /* Primary button = the arrow (circular, high-contrast chip) */
 #ci button.gr-button.primary {
   width: 46px; min-width: 46px; height: 46px;       /* bigger target */
@@ -466,8 +474,18 @@ body { background: #f3f6fb; }
 /* Hover/active states for tactile feel */
 #ci button.gr-button.primary:hover { filter: brightness(1.06); transform: translateY(-1px); }
 #ci button.gr-button.primary:active { transform: translateY(0); filter: brightness(0.98); }
+
 /* Secondary buttons keep rounded look, but stay subtle */
 #ci button.gr-button { border-radius: 12px !important; }
+
+/* ---- Defensive overrides for devices that auto-apply dark mode ---- */
+@media (prefers-color-scheme: dark) {
+  #ci, #ci * { color: var(--text-dark) !important; }
+  #ci .message.bot { background: #e5e7eb !important; }
+  #ci .message.bot *, #ci .gr-markdown * { color: var(--text-dark) !important; }
+  html, body { background: #f3f6fb !important; }
+}
+
 /* Keep layout tidy on wide screens */
 .gradio-container { padding: 12px; }
 """)
