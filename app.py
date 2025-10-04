@@ -38,7 +38,7 @@ def _get_bool(name: str, default: bool = True) -> bool:
         return default
     return str(raw).strip().lower() in {"1", "true", "yes", "y", "on"}
 
-LOOKING_FOR_ROLE = _get_bool("LOOKING_FOR_ROLE", False)
+LOOKING_FOR_ROLE = _get_bool("LOOKING_FOR_ROLE", True)
 
 # # Default decline line when not looking (used for job/offer inquiries)
 # DECLINE_TEMPLATE = (
