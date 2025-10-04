@@ -23,6 +23,16 @@ def _get_openai_key():
     return os.getenv("OPENAI_API_KEY") or os.getenv("openai_api_key")
 
 OPENAI_API_KEY = _get_openai_key()
+
+# Looking/not-looking flag (default True = actively looking)
+def _get_bool(name: str, default: bool = True) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return str(raw).strip().lower() in {"1", "true", "yes", "y", "on"}
+
+LOOKING_FOR_ROLE = _get_bool("LOOKING_FOR_ROLE", True)
+
 PUSHOVER_USER  = os.getenv("PUSHOVER_USER")
 PUSHOVER_TOKEN = os.getenv("PUSHOVER_TOKEN")
 PUSHOVER_URL   = os.getenv("PUSHOVER_URL") or "https://api.pushover.net/1/messages.json"
@@ -30,6 +40,7 @@ PUSHOVER_URL   = os.getenv("PUSHOVER_URL") or "https://api.pushover.net/1/messag
 OPENAI_READY = bool(OPENAI_API_KEY)
 print(f"OpenAI key present: {OPENAI_READY}")
 print(f"Pushover configured: {bool(PUSHOVER_USER and PUSHOVER_TOKEN)}")
+print(f"Looking for role: {LOOKING_FOR_ROLE}")
 
 # -------------
 # Pushover util
@@ -123,9 +134,27 @@ if summary_path.exists():
         print(f"Summary read error: {e}")
 
 # ----------------------------
-# System prompt
+# System prompt (dynamic by availability)
 # ----------------------------
 name = "Robert Morrow"
+
+availability_instructions = (
+    # Actively looking
+    "AVAILABILITY:\n"
+    "- Robert is **actively looking for a new position**.\n"
+    "- When relevant, briefly mention he’s exploring opportunities now.\n"
+    "- Ask 2–4 concise, qualifying questions (role, team/domain, location/remote, comp range, timeline).\n"
+    "- Proactively and politely ask for an email to follow up; use `record_user_details` to capture it.\n"
+    "- Be confident and concise—never sound desperate.\n"
+    if LOOKING_FOR_ROLE else
+    # Not actively looking
+    "AVAILABILITY:\n"
+    "- Robert is **not actively looking** right now.\n"
+    "- If someone offers a role, be appreciative and neutral; avoid presenting as actively searching.\n"
+    "- He’s open to **exceptional** opportunities only; request contact details **only** if it sounds like a strong fit.\n"
+    "- Keep tone friendly and professional.\n"
+)
+
 system_prompt = (
     f"You are acting as {name}. You are answering questions on {name}'s website, "
     f"particularly questions related to {name}'s career, background, skills and experience. "
@@ -136,7 +165,8 @@ system_prompt = (
     f"you couldn't answer, even if it's about something trivial or unrelated to career. "
     f"If the user is engaging in discussion, try to steer them towards getting in touch via email; ask for their email "
     f"and record it using your record_user_details tool. "
-    "\n\nIMPORTANT: When answering questions about employment, current job, or tenure, treat multiple roles "
+    "\n\n" + availability_instructions +
+    "\nIMPORTANT: When answering questions about employment, current job, or tenure, treat multiple roles "
     "at the same employer as a combined employment history. Identify all roles listed for that employer in the provided "
     "profile. For each role, state the job title, start and end dates (or 'Present' if currently held), and the duration in years and months. "
     "Compute and state the total combined tenure at that employer by summing durations across all roles and avoiding "
@@ -189,6 +219,18 @@ G1 = "#2563EB"        # royal blue
 G2 = "#06B6D4"        # cyan
 TEXT_DARK = "#0F172A" # slate-900
 
+# Badge styles depend on availability
+if LOOKING_FOR_ROLE:
+    BADGE_BG = "linear-gradient(135deg, #10b981, #22d3ee)"  # emerald -> cyan
+    BADGE_COLOR = "#ffffff"
+    BADGE_SHADOW = "0 8px 16px rgba(16,185,129,.28)"
+    BADGE_TEXT = "Open to opportunities"
+else:
+    BADGE_BG = "#e2e8f0"   # slate-200
+    BADGE_COLOR = "#0f172a"
+    BADGE_SHADOW = "inset 0 0 0 1px #cbd5e1"
+    BADGE_TEXT = "Not actively looking"
+
 # Theme
 theme = gr.themes.Soft(
     primary_hue="indigo",
@@ -198,8 +240,8 @@ theme = gr.themes.Soft(
     font_mono=[gr.themes.GoogleFont("Fira Code"), "ui-monospace"],
 )
 
-# Header markup
-header_html = """
+# Header markup (includes availability badge)
+header_html = f"""
 <div class="hero">
   <div class="hero-left">
     <div class="hero-avatar"></div>
@@ -208,6 +250,7 @@ header_html = """
       <div class="hero-subtitle">I can answer a lot of your questions.</div>
     </div>
   </div>
+  <div class="hero-badge">{BADGE_TEXT}</div>
 </div>
 """
 
@@ -217,10 +260,11 @@ _css_tpl = Template(r"""
   --g1: $G1;
   --g2: $G2;
   --text-dark: $TEXT_DARK;
+  --badge-bg: $BADGE_BG;
+  --badge-color: $BADGE_COLOR;
+  --badge-shadow: $BADGE_SHADOW;
 }
-
 body { background: #f3f6fb; }
-
 #chat-shell {
   position: relative;
   max-width: 760px;
@@ -230,14 +274,13 @@ body { background: #f3f6fb; }
   background: linear-gradient(135deg, var(--g1), var(--g2));
   box-shadow: 0 20px 50px rgba(2, 6, 23, 0.14);
 }
-
 #chat-inner {
   background: #ffffff;
   border-radius: 16px;
   overflow: hidden;
 }
-
 .hero {
+  display:flex; align-items:center; justify-content:space-between;
   background: linear-gradient(135deg, var(--g1), var(--g2));
   color: #fff;
   padding: 16px 18px;
@@ -251,13 +294,18 @@ body { background: #f3f6fb; }
 }
 .hero-title { font-weight: 700; font-size: 18px; line-height: 1.2; }
 .hero-subtitle { opacity: .9; font-size: 13px; }
-
+.hero-badge {
+  font-size: 12px; font-weight: 700; letter-spacing: .2px;
+  padding: 8px 10px; border-radius: 9999px;
+  background: var(--badge-bg); color: var(--badge-color);
+  box-shadow: var(--badge-shadow);
+  white-space: nowrap;
+}
 #ci {                             /* wrapper around ChatInterface */
   background: #fff;
   border-radius: 0 0 16px 16px;
   padding: 8px 10px 12px;
 }
-
 /* Chat area */
 #ci .gr-chatbot, #ci .chatbot { background:#ffffff; }
 #ci .message.bot {
@@ -277,9 +325,7 @@ body { background: #f3f6fb; }
 #ci .gr-chatbot, #ci .chatbot {
   filter: saturate(1.05) contrast(1.03);
 }
-
 /* ===== Input row: clearer box + prominent send arrow ===== */
-
 /* Textbox shell */
 #ci .gr-textbox {
   background: #f8fafc !important;                  /* light fill so it stands out */
@@ -287,7 +333,6 @@ body { background: #f3f6fb; }
   border-radius: 14px !important;
   box-shadow: inset 0 1px 0 rgba(255,255,255,.6);
 }
-
 /* Textarea itself */
 #ci .gr-textbox textarea {
   padding: 14px 16px !important;
@@ -300,7 +345,6 @@ body { background: #f3f6fb; }
   color: #64748b !important;                        /* slate-500 */
   opacity: .95 !important;
 }
-
 /* Focus state: subtle two-ring glow using your palette */
 #ci .gr-textbox:focus-within {
   border-color: transparent !important;
@@ -309,10 +353,8 @@ body { background: #f3f6fb; }
     0 0 0 5px rgba(6,182,212,.20),                  /* cyan outer ring */
     inset 0 1px 0 rgba(255,255,255,.6) !important;
 }
-
 /* Layout: keep the input row tight */
 #ci .gr-form, #ci .gradio-row { gap: 10px; }
-
 /* Primary button = the arrow (circular, high-contrast chip) */
 #ci button.gr-button.primary {
   width: 46px; min-width: 46px; height: 46px;       /* bigger target */
@@ -324,7 +366,6 @@ body { background: #f3f6fb; }
   box-shadow: 0 10px 22px rgba(37,99,235,.28);
   display: inline-flex; align-items: center; justify-content: center;
 }
-
 /* Arrow icon inside the button */
 #ci button.gr-button.primary svg {
   width: 22px; height: 22px;
@@ -332,18 +373,18 @@ body { background: #f3f6fb; }
   stroke: #ffffff !important; fill: #ffffff !important;
   filter: drop-shadow(0 1px 1px rgba(0,0,0,.18));
 }
-
 /* Hover/active states for tactile feel */
 #ci button.gr-button.primary:hover { filter: brightness(1.06); transform: translateY(-1px); }
 #ci button.gr-button.primary:active { transform: translateY(0); filter: brightness(0.98); }
-
 /* Secondary buttons keep rounded look, but stay subtle */
 #ci button.gr-button { border-radius: 12px !important; }
-
 /* Keep layout tidy on wide screens */
 .gradio-container { padding: 12px; }
 """)
-css = _css_tpl.substitute(G1=G1, G2=G2, TEXT_DARK=TEXT_DARK)
+css = _css_tpl.substitute(
+    G1=G1, G2=G2, TEXT_DARK=TEXT_DARK,
+    BADGE_BG=BADGE_BG, BADGE_COLOR=BADGE_COLOR, BADGE_SHADOW=BADGE_SHADOW
+)
 
 # Chatbot area
 chatbot = gr.Chatbot(
