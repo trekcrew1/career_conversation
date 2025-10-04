@@ -40,12 +40,59 @@ def _get_bool(name: str, default: bool = True) -> bool:
 
 LOOKING_FOR_ROLE = _get_bool("LOOKING_FOR_ROLE", False)
 
-# Default decline line when not looking (used for job/offer inquiries)
-DECLINE_TEMPLATE = (
-    "Thanks for the offer and for reaching out about a position. "
-    "I’m currently very happy where I am and not looking, "
-    "but I welcome connecting with interesting people."
+# # Default decline line when not looking (used for job/offer inquiries)
+# DECLINE_TEMPLATE = (
+#     "Thanks for the offer and for reaching out about a position. "
+#     "I’m currently very happy where I am and not looking, "
+#     "but I welcome connecting with interesting people."
+# )
+
+# --- Dynamic decline powered by OpenAI ---
+DECLINE_FALLBACK = (
+    "Thanks so much for reaching out about the role. "
+    "I’m very happy where I am and not looking right now, "
+    "but I appreciate the connection and would love to stay in touch."
 )
+
+def generate_polite_decline(user_text: str) -> str:
+    """
+    Create a short, polite, appreciative decline tailored to the inbound message.
+    Requirements:
+      - 1–3 sentences, professional and warm.
+      - Clearly say Robert is very happy where he is and not looking.
+      - Welcome staying connected / keeping in touch.
+      - Do NOT ask for email or share a resume.
+    """
+    if not OPENAI_READY:
+        return DECLINE_FALLBACK
+    try:
+        client = OpenAI()  # reads OPENAI_API_KEY from env
+        system = (
+            "You write brief, professional replies on behalf of Robert Morrow. "
+            "When a recruiter or contact proposes a role, craft a concise decline "
+            "that is appreciative and polite. Make it clear Robert is very happy "
+            "where he is and not looking. Invite staying connected. 1–3 sentences. "
+            "No resume sharing. No over-promising. Keep it friendly."
+        )
+        messages = [
+            {"role": "system", "content": system},
+            {
+                "role": "user",
+                "content": f"Compose the reply to this inbound message:\n\n{user_text}",
+            },
+        ]
+        resp = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=messages,
+            temperature=0.4,
+            max_tokens=120,
+        )
+        text = resp.choices[0].message.content.strip()
+        return text or DECLINE_FALLBACK
+    except Exception as e:
+        print(f"Decline generation error: {e}")
+        return DECLINE_FALLBACK
+
 
 PUSHOVER_USER  = os.getenv("PUSHOVER_USER")
 PUSHOVER_TOKEN = os.getenv("PUSHOVER_TOKEN")
@@ -180,10 +227,8 @@ availability_instructions = (
     if LOOKING_FOR_ROLE else
     # Not actively looking
     "AVAILABILITY:\n"
-    "- Robert is **not actively looking** right now and is happy where he is.\n"
-    "- If the user proposes discussing a job/role/opportunity, **begin your reply with this exact sentence**:\n"
-    f'  \"{DECLINE_TEMPLATE}\"\n'
-    "- Stay appreciative and neutral; avoid presenting as actively searching.\n"
+    "- Robert is **not actively looking** and is happy where he is.\n"
+    "- Be appreciative and neutral; avoid presenting as actively searching.\n"
     "- Only request contact details if the opportunity sounds truly exceptional.\n"
 )
 
@@ -212,6 +257,15 @@ system_prompt = (
     f"With this context, please chat with the user, always staying in character as {name}."
 )
 
+# def _looks_like_job_pitch(text: str) -> bool:
+#     t = (text or "").lower()
+#     keywords = (
+#         "job", "position", "role", "opportunity", "opening",
+#         "hire", "hiring", "recruit", "recruiter", "headcount",
+#         "interview", "join our", "work with us", "offer"
+#     )
+#     return any(k in t for k in keywords)
+
 def _looks_like_job_pitch(text: str) -> bool:
     t = (text or "").lower()
     keywords = (
@@ -228,9 +282,9 @@ def chat(message, history):
     if not OPENAI_READY:
         return "Server is not configured with OPENAI_API_KEY. Add it in Settings → Variables & secrets, then restart this Space."
 
-    # If not looking and the message is about a job/offer, use your template immediately.
+    # If not looking and the inbound reads like a job/offer, produce a tailored decline
     if not LOOKING_FOR_ROLE and _looks_like_job_pitch(message):
-        return DECLINE_TEMPLATE
+        return generate_polite_decline(message)
     
     messages = [{"role": "system", "content": system_prompt}] + history + [{"role": "user", "content": message}]
     while True:
@@ -292,7 +346,7 @@ header_html = f"""
     <div class="hero-avatar"></div>
     <div class="hero-text">
       <div class="hero-title">Chat with Robert's profile AI</div>
-      <div class="hero-subtitle">I can answer a lot of your questions.</div>
+      <div class="hero-subtitle">I can respond and answer most of the questions you may have.</div>
     </div>
   </div>
   <div class="hero-badge">{BADGE_TEXT}</div>
