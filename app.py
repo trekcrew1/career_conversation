@@ -76,6 +76,15 @@ def generate_polite_decline(user_text: str) -> str:
         print(f"Decline generation error: {e}")
         return DECLINE_FALLBACK
 
+def _moderate(text: str) -> bool:
+    try:
+        from openai import OpenAI
+        client = OpenAI()
+        r = client.moderations.create(model="omni-moderation-latest", input=text)
+        return bool(r.results[0].flagged)
+    except Exception:
+        return False  # fail open if moderation unavailable
+
 
 PUSHOVER_USER  = os.getenv("PUSHOVER_USER")
 PUSHOVER_TOKEN = os.getenv("PUSHOVER_TOKEN")
@@ -243,6 +252,9 @@ def chat(message, history):
     if not LOOKING_FOR_ROLE and _looks_like_job_pitch(message):
         return generate_polite_decline(message)
 
+    if _moderate(message):
+        return "I’m going to keep it professional and skip that. Happy to discuss my experience, projects, and fit for roles."
+    
     messages = [{"role": "system", "content": system_prompt}] + history + [{"role": "user", "content": message}]
     while True:
         try:
