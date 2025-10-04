@@ -25,7 +25,7 @@ def _get_openai_key():
 
 OPENAI_API_KEY = _get_openai_key()
 
-# Looking/not-looking flag (default False here per your last code)
+# Looking/not-looking flag (default: True here per your current file)
 def _get_bool(name: str, default: bool = True) -> bool:
     raw = os.getenv(name)
     if raw is None:
@@ -77,6 +77,47 @@ def generate_polite_decline(user_text: str) -> str:
         print(f"Decline generation error: {e}")
         return DECLINE_FALLBACK
 
+# --- Dynamic interested reply powered by OpenAI (for when LOOKING_FOR_ROLE=True) ---
+INTEREST_FALLBACK = (
+    "Thanks for reaching out — I’m currently exploring opportunities. "
+    "Could you share a bit more about the role (scope, team/domain, remote or on-site, "
+    "comp range, and timeline)? Happy to continue the conversation."
+)
+
+def generate_polite_interest(user_text: str) -> str:
+    """
+    Create a short, professional 'interested' reply.
+    Requirements:
+      - 1–3 sentences, appreciative and confident (not desperate).
+      - Ask 2–4 concise, qualifying questions (scope, team/domain, remote/on-site, comp range, timeline).
+      - Do NOT share personal contact details or ask for email here.
+    """
+    if not OPENAI_READY:
+        return INTEREST_FALLBACK
+    try:
+        client = OpenAI()
+        system = (
+            "You write brief, professional replies on behalf of Robert Morrow. "
+            "When a recruiter proposes a role and Robert IS open to opportunities, craft a concise, "
+            "confident reply (1–3 sentences) that is appreciative and asks 2–4 qualifying questions: "
+            "role scope, team/domain, remote/on-site, comp range, and timeline. "
+            "Avoid sounding desperate. Do NOT include personal contact details or ask for an email."
+        )
+        messages = [
+            {"role": "system", "content": system},
+            {"role": "user", "content": f"Compose the reply to this inbound message:\n\n{user_text}"},
+        ]
+        resp = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=messages,
+            temperature=0.4,
+            max_tokens=140,
+        )
+        text = resp.choices[0].message.content.strip()
+        return text or INTEREST_FALLBACK
+    except Exception as e:
+        print(f"Interest generation error: {e}")
+        return INTEREST_FALLBACK
 
 PUSHOVER_USER  = os.getenv("PUSHOVER_USER")
 PUSHOVER_TOKEN = os.getenv("PUSHOVER_TOKEN")
@@ -179,7 +220,87 @@ if summary_path.exists():
         print(f"Summary read error: {e}")
 
 # ----------------------------
-# System prompt (dynamic by availability)
+# Curated education facts (deterministic answers)
+# ----------------------------
+EDUCATION = [
+    {
+        "institution": "Cleveland State University",
+        "credential": "BBA (Information Technology)",
+        "dates": "Feb 2008 – Jun 2010",
+        "details": [
+            "Completed 60 credit hours before transitioning to full-time work."
+        ],
+    },
+    {
+        "institution": "Louisiana State University",
+        "credential": "Certificate, Information Technology (COAWA – Principles of Cloud Computing I)",
+        "dates": "May 2023 – Jun 2023",
+        "details": [
+            "Covered motivations for cloud computing (business, economic, political).",
+            "Deployment models (public/private/hybrid) and service types (IaaS, PaaS, SaaS).",
+            "OSI model in the context of cloud.",
+            "Vendor selection concepts."
+        ],
+    },
+    {
+        "institution": "Udemy",
+        "credential": "Certificate, IoT Enabled Aeroponics using Raspberry Pi 3",
+        "dates": "Jan 2022",
+        "details": [
+            "Flow sensor, LCD, ultrasonic water mister control on Raspberry Pi.",
+            "Beebotte dashboard for remote monitoring; environment variables tracking."
+        ],
+    },
+    {
+        "institution": "Udemy",
+        "credential": "Certificate, Growing Microgreens for Business and Pleasure",
+        "dates": "Jun 2020",
+        "details": [
+            "Home microgreen garden: equipment, soil & hydroponic methods, environment setup, plant care."
+        ],
+    },
+    {
+        "institution": "Udemy",
+        "credential": "Deep Learning (course)",
+        "dates": "2018 – 2019",
+        "details": [
+            "Real-world tasks: ANN for churn, CNNs for image recognition, RNNs for stock prediction.",
+            "SOMs for fraud, Boltzmann machines for recommenders, stacked autoencoders.",
+            "TensorFlow & PyTorch."
+        ],
+    },
+    {
+        "institution": "Udemy",
+        "credential": "Artificial Intelligence – The AI Masterclass",
+        "dates": "2018 – 2019",
+        "details": [
+            "Hybrid Intelligent Systems; DL/DRL/Policy Gradient/NeuroEvolution.",
+            "TF & Keras; FCNNs, CNNs, RNNs, VAEs, MDNs, Genetic Algorithms, ES, CMA-ES, PEPG."
+        ],
+    },
+]
+
+def _education_markdown() -> str:
+    lines = ["### Education"]
+    for item in EDUCATION:
+        lines.append(f"**{item['institution']}** — {item['credential']}  \n{item['dates']}")
+        if item.get("details"):
+            for d in item["details"]:
+                lines.append(f"- {d}")
+        lines.append("")  # spacer
+    return "\n".join(lines)
+
+def _looks_like_education(text: str) -> bool:
+    t = (text or "").lower()
+    keys = (
+        "education", "degree", "degrees", "school", "schools", "university", "college",
+        "bba", "bs", "b.s.", "certificate", "certifications", "udemy", "lsu", "louisiana state",
+        "cleveland state", "coursework", "studies", "study"
+    )
+    return any(k in t for k in keys)
+
+# ----------------------------
+# System prompt (dynamic by availability) + include curated education context
 # ----------------------------
 name = "Robert Morrow"
 
@@ -198,6 +319,8 @@ availability_instructions = (
     "- Be appreciative and neutral; avoid presenting as actively searching.\n"
     "- Only request contact details if the opportunity sounds truly exceptional.\n"
 )
+
+education_context = _education_markdown()
 
 system_prompt = (
     f"You are acting as {name}. You are answering questions on {name}'s website, "
@@ -221,7 +344,9 @@ system_prompt = (
     "Example format: \"Rocket Mortgage — Total 9 years 8 months (Data Engineer, Mar 2023-Present — 2 yr 7 mo; "
     "Software Engineer, Feb 2016-Mar 2023 — 7 yr 2 mo)\"."
     f"\n\n## Summary:\n{summary}\n\n## LinkedIn Profile:\n{linkedin}\n\n"
-    f"With this context, please chat with the user, always staying in character as {name}."
+    f"## Education (curated – authoritative)\n{education_context}\n"
+    f"With this context, please chat with the user, always staying in character as {name}.\n"
+    "When asked about Education, prefer this curated section over inference; if something is not in the list, say you’re not certain."
 )
 
 def _looks_like_job_pitch(text: str) -> bool:
@@ -347,17 +472,19 @@ def chat(message, history):
     if inbound_block:
         return inbound_block
 
-    # If not looking and the inbound reads like a job/offer, produce a tailored decline
-    if not LOOKING_FOR_ROLE and _looks_like_job_pitch(message):
-        return generate_polite_decline(message)
-    
-    # Sanitize message before sending to OpenAI.
-    message = safe_finalize(message)
+    # Job/offer handling (safe in both modes)
+    if _looks_like_job_pitch(message):
+        reply = generate_polite_interest(message) if LOOKING_FOR_ROLE else generate_polite_decline(message)
+        return safe_finalize(reply)
 
+    # Education queries: deterministic, no LLM
+    if _looks_like_education(message):
+        return _education_markdown()
+
+    # LLM path
     messages = [{"role": "system", "content": system_prompt}] + history + [{"role": "user", "content": message}]
     while True:
         try:
-            # Instantiate client at call time; SDK reads OPENAI_API_KEY from env
             client = OpenAI()
             response = client.chat.completions.create(
                 model="gpt-4o-mini",
@@ -421,7 +548,6 @@ header_html = f"""
       </div>
     </div>
   </div>
-
   <!-- Badge pinned to the top-right with 5px "border" inside the header -->
   <div class="hero-badge">{BADGE_TEXT}</div>
 </div>
