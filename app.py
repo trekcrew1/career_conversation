@@ -324,7 +324,7 @@ header_html = f"""
     <div class="hero-avatar"></div>
     <div class="hero-text">
       <div class="hero-title">Chat with Robert's profile AI</div>
-      <div class="notice">
+      <div class="notice" style="margin-top:20px;">
         <span class="dot"></span>
         <span class="text"><i>I’m an AI version of Robert. I’m still learning and may be wrong sometimes—please verify important info.</i></span>
       </div>
