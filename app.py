@@ -307,6 +307,10 @@ header_html = f"""
     <div class="hero-text">
       <div class="hero-title">Chat with Robert's profile AI</div>
       <div class="hero-subtitle">I can respond and answer most of the questions you may have.</div>
+      <div class="notice">
+        <span class="dot"></span>
+        <span class="text">I’m an AI version of Robert. I’m still learning and may be wrong sometimes—please verify important info.</span>
+      </div>
     </div>
   </div>
   <div class="hero-badge">{BADGE_TEXT}</div>
