@@ -6,6 +6,7 @@ from openai import OpenAI
 import requests
 from pypdf import PdfReader
 import gradio as gr
+from string import Template
 
 # Load .env for local dev; on Spaces, env comes from "Variables & secrets"
 load_dotenv(override=True)
