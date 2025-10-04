@@ -24,13 +24,6 @@ def _get_openai_key():
 
 OPENAI_API_KEY = _get_openai_key()
 
-# # Looking/not-looking flag (default True = actively looking)
-# def _get_bool(name: str, default: bool = True) -> bool:
-#     raw = os.getenv(name)
-#     if raw is None:
-#         return default
-#     return str(raw).strip().lower() in {"1", "true", "yes", "y", "on"}
-
 # Looking/not-looking flag (default True = actively looking)
 def _get_bool(name: str, default: bool = True) -> bool:
     raw = os.getenv(name)
@@ -39,13 +32,6 @@ def _get_bool(name: str, default: bool = True) -> bool:
     return str(raw).strip().lower() in {"1", "true", "yes", "y", "on"}
 
 LOOKING_FOR_ROLE = _get_bool("LOOKING_FOR_ROLE", True)
-
-# # Default decline line when not looking (used for job/offer inquiries)
-# DECLINE_TEMPLATE = (
-#     "Thanks for the offer and for reaching out about a position. "
-#     "I’m currently very happy where I am and not looking, "
-#     "but I welcome connecting with interesting people."
-# )
 
 # --- Dynamic decline powered by OpenAI ---
 DECLINE_FALLBACK = (
@@ -199,23 +185,6 @@ if summary_path.exists():
 # ----------------------------
 name = "Robert Morrow"
 
-# availability_instructions = (
-#     # Actively looking
-#     "AVAILABILITY:\n"
-#     "- Robert is **actively looking for a new position**.\n"
-#     "- When relevant, briefly mention he’s exploring opportunities now.\n"
-#     "- Ask 2–4 concise, qualifying questions (role, team/domain, location/remote, comp range, timeline).\n"
-#     "- Proactively and politely ask for an email to follow up; use `record_user_details` to capture it.\n"
-#     "- Be confident and concise—never sound desperate.\n"
-#     if LOOKING_FOR_ROLE else
-#     # Not actively looking
-#     "AVAILABILITY:\n"
-#     "- Robert is **not actively looking** right now.\n"
-#     "- If someone offers a role, be appreciative and neutral; avoid presenting as actively searching.\n"
-#     "- He’s open to **exceptional** opportunities only; request contact details **only** if it sounds like a strong fit.\n"
-#     "- Keep tone friendly and professional.\n"
-# )
-
 availability_instructions = (
     # Actively looking
     "AVAILABILITY:\n"
@@ -256,15 +225,6 @@ system_prompt = (
     f"\n\n## Summary:\n{summary}\n\n## LinkedIn Profile:\n{linkedin}\n\n"
     f"With this context, please chat with the user, always staying in character as {name}."
 )
-
-# def _looks_like_job_pitch(text: str) -> bool:
-#     t = (text or "").lower()
-#     keywords = (
-#         "job", "position", "role", "opportunity", "opening",
-#         "hire", "hiring", "recruit", "recruiter", "headcount",
-#         "interview", "join our", "work with us", "offer"
-#     )
-#     return any(k in t for k in keywords)
 
 def _looks_like_job_pitch(text: str) -> bool:
     t = (text or "").lower()
