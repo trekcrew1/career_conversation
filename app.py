@@ -347,9 +347,12 @@ def chat(message, history):
     if inbound_block:
         return inbound_block
 
-    # If not looking and the inbound reads like a job/offer, produce a tailored decline (then pass through safety)
+    # If not looking and the inbound reads like a job/offer, produce a tailored decline
     if not LOOKING_FOR_ROLE and _looks_like_job_pitch(message):
-        return safe_finalize(generate_polite_decline(message))
+        return generate_polite_decline(message)
+    
+    # Sanitize message before sending to OpenAI.
+    message = safe_finalize(message)
 
     messages = [{"role": "system", "content": system_prompt}] + history + [{"role": "user", "content": message}]
     while True:
