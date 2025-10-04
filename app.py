@@ -24,6 +24,13 @@ def _get_openai_key():
 
 OPENAI_API_KEY = _get_openai_key()
 
+# # Looking/not-looking flag (default True = actively looking)
+# def _get_bool(name: str, default: bool = True) -> bool:
+#     raw = os.getenv(name)
+#     if raw is None:
+#         return default
+#     return str(raw).strip().lower() in {"1", "true", "yes", "y", "on"}
+
 # Looking/not-looking flag (default True = actively looking)
 def _get_bool(name: str, default: bool = True) -> bool:
     raw = os.getenv(name)
@@ -32,6 +39,13 @@ def _get_bool(name: str, default: bool = True) -> bool:
     return str(raw).strip().lower() in {"1", "true", "yes", "y", "on"}
 
 LOOKING_FOR_ROLE = _get_bool("LOOKING_FOR_ROLE", False)
+
+# Default decline line when not looking (used for job/offer inquiries)
+DECLINE_TEMPLATE = (
+    "Thanks for the offer and for reaching out about a position. "
+    "I’m currently very happy where I am and not looking, "
+    "but I welcome connecting with interesting people."
+)
 
 PUSHOVER_USER  = os.getenv("PUSHOVER_USER")
 PUSHOVER_TOKEN = os.getenv("PUSHOVER_TOKEN")
@@ -138,6 +152,23 @@ if summary_path.exists():
 # ----------------------------
 name = "Robert Morrow"
 
+# availability_instructions = (
+#     # Actively looking
+#     "AVAILABILITY:\n"
+#     "- Robert is **actively looking for a new position**.\n"
+#     "- When relevant, briefly mention he’s exploring opportunities now.\n"
+#     "- Ask 2–4 concise, qualifying questions (role, team/domain, location/remote, comp range, timeline).\n"
+#     "- Proactively and politely ask for an email to follow up; use `record_user_details` to capture it.\n"
+#     "- Be confident and concise—never sound desperate.\n"
+#     if LOOKING_FOR_ROLE else
+#     # Not actively looking
+#     "AVAILABILITY:\n"
+#     "- Robert is **not actively looking** right now.\n"
+#     "- If someone offers a role, be appreciative and neutral; avoid presenting as actively searching.\n"
+#     "- He’s open to **exceptional** opportunities only; request contact details **only** if it sounds like a strong fit.\n"
+#     "- Keep tone friendly and professional.\n"
+# )
+
 availability_instructions = (
     # Actively looking
     "AVAILABILITY:\n"
@@ -149,10 +180,11 @@ availability_instructions = (
     if LOOKING_FOR_ROLE else
     # Not actively looking
     "AVAILABILITY:\n"
-    "- Robert is **not actively looking** right now.\n"
-    "- If someone offers a role, be appreciative and neutral; avoid presenting as actively searching.\n"
-    "- He’s open to **exceptional** opportunities only; request contact details **only** if it sounds like a strong fit.\n"
-    "- Keep tone friendly and professional.\n"
+    "- Robert is **not actively looking** right now and is happy where he is.\n"
+    "- If the user proposes discussing a job/role/opportunity, **begin your reply with this exact sentence**:\n"
+    f'  \"{DECLINE_TEMPLATE}\"\n'
+    "- Stay appreciative and neutral; avoid presenting as actively searching.\n"
+    "- Only request contact details if the opportunity sounds truly exceptional.\n"
 )
 
 system_prompt = (
@@ -180,6 +212,15 @@ system_prompt = (
     f"With this context, please chat with the user, always staying in character as {name}."
 )
 
+def _looks_like_job_pitch(text: str) -> bool:
+    t = (text or "").lower()
+    keywords = (
+        "job", "position", "role", "opportunity", "opening",
+        "hire", "hiring", "recruit", "recruiter", "headcount",
+        "interview", "join our", "work with us", "offer"
+    )
+    return any(k in t for k in keywords)
+
 # ----------------------------
 # Chat handler
 # ----------------------------
@@ -187,6 +228,10 @@ def chat(message, history):
     if not OPENAI_READY:
         return "Server is not configured with OPENAI_API_KEY. Add it in Settings → Variables & secrets, then restart this Space."
 
+    # If not looking and the message is about a job/offer, use your template immediately.
+    if not LOOKING_FOR_ROLE and _looks_like_job_pitch(message):
+        return DECLINE_TEMPLATE
+    
     messages = [{"role": "system", "content": system_prompt}] + history + [{"role": "user", "content": message}]
     while True:
         try:
