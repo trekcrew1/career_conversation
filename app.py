@@ -300,22 +300,39 @@ theme = gr.themes.Soft(
 )
 
 # Header markup (includes availability badge)
+# header_html = f"""
+# <div class="hero">
+#   <div class="hero-left">
+#     <div class="hero-avatar"></div>
+#     <div class="hero-text">
+#       <div class="hero-title">Chat with Robert's profile AI</div>
+#       <!--<div class="hero-subtitle">I can respond and answer most of the questions you may have.</div>-->
+#       <div class="notice">
+#         <span class="dot"></span>
+#         <span class="text"><i>I’m an AI version of Robert. I’m still learning and may be wrong sometimes—please verify important info.</i></span>
+#       </div>
+#     </div>
+#   </div>
+#   <div class="hero-badge">{BADGE_TEXT}</div>
+# </div>
+# """
+
+
 header_html = f"""
 <div class="hero">
   <div class="hero-left">
     <div class="hero-avatar"></div>
     <div class="hero-text">
       <div class="hero-title">Chat with Robert's profile AI</div>
-      <!--<div class="hero-subtitle">I can respond and answer most of the questions you may have.</div>-->
-      <div class="notice">
-        <span class="dot"></span>
-        <span class="text"><i>I’m an AI version of Robert. I’m still learning and may be wrong sometimes—please verify important info.</i></span>
-      </div>
+      <div class="hero-subtitle">I can answer a lot of your questions.</div>
     </div>
   </div>
+
+  <!-- Badge pinned to the top-right with 5px "border" inside the header -->
   <div class="hero-badge">{BADGE_TEXT}</div>
 </div>
 """
+
 
 # CSS via Template so normal braces don't break Python
 _css_tpl = Template(r"""
@@ -343,7 +360,9 @@ body { background: #f3f6fb; }
   overflow: hidden;
 }
 .hero {
-  display:flex; align-items:center; justify-content:space-between;
+  position: relative;                        /* allow absolute child positioning */
+  display: flex; align-items: center;        /* keep the avatar/title row aligned */
+  justify-content: flex-start;               /* badge is now absolutely positioned */
   background: linear-gradient(135deg, var(--g1), var(--g2));
   color: #fff;
   padding: 16px 18px;
@@ -358,6 +377,11 @@ body { background: #f3f6fb; }
 .hero-title { font-weight: 700; font-size: 18px; line-height: 1.2; }
 .hero-subtitle { opacity: .9; font-size: 13px; }
 .hero-badge {
+  position: absolute;
+  top: 5px;                                  /* 5px from the top edge */
+  right: 5px;                                /* 5px from the right edge */
+  z-index: 1;
+
   font-size: 12px; font-weight: 700; letter-spacing: .2px;
   padding: 8px 10px; border-radius: 9999px;
   background: var(--badge-bg); color: var(--badge-color);
