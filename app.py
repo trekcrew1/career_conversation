@@ -1,34 +1,48 @@
+# app.py
 import os
 import json
 from pathlib import Path
+from string import Template
+
 from dotenv import load_dotenv
 from openai import OpenAI
 import requests
 from pypdf import PdfReader
 import gradio as gr
-from string import Template
 
-# Load .env for local dev; on Spaces, env comes from "Variables & secrets"
-load_dotenv(override=True)
+# ----------------------------
+# Environment & configuration
+# ----------------------------
+load_dotenv(override=True)  # useful locally; harmless on Spaces
 
-# --- Config / env ---
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY") or os.getenv("openai_api_key")
+def _get_openai_key():
+    # ultra-robust fetch in case of odd casing/whitespace
+    for k, v in os.environ.items():
+        if k.strip().upper() == "OPENAI_API_KEY" and v:
+            return v
+    return os.getenv("OPENAI_API_KEY") or os.getenv("openai_api_key")
+
+OPENAI_API_KEY = _get_openai_key()
 PUSHOVER_USER  = os.getenv("PUSHOVER_USER")
 PUSHOVER_TOKEN = os.getenv("PUSHOVER_TOKEN")
 PUSHOVER_URL   = os.getenv("PUSHOVER_URL") or "https://api.pushover.net/1/messages.json"
 
-OPENAI_READY = bool(OPENAI_API_KEY)  # don't instantiate client yet
+OPENAI_READY = bool(OPENAI_API_KEY)
 print(f"OpenAI key present: {OPENAI_READY}")
 print(f"Pushover configured: {bool(PUSHOVER_USER and PUSHOVER_TOKEN)}")
 
-# --- Pushover helper (no-op if not configured) ---
+# -------------
+# Pushover util
+# -------------
 def push(message: str):
     if not (PUSHOVER_USER and PUSHOVER_TOKEN and PUSHOVER_URL):
         return
     try:
-        requests.post(PUSHOVER_URL, data={
-            "user": PUSHOVER_USER, "token": PUSHOVER_TOKEN, "message": message
-        }, timeout=10)
+        requests.post(
+            PUSHOVER_URL,
+            data={"user": PUSHOVER_USER, "token": PUSHOVER_TOKEN, "message": message},
+            timeout=10,
+        )
     except Exception as e:
         print(f"Pushover error: {e}")
 
@@ -40,7 +54,9 @@ def record_unknown_question(question):
     push(f"Recording {question} asked that I couldn't answer")
     return {"recorded": "ok"}
 
-# --- Tool schemas for function calling ---
+# --------------------------
+# Tool schemas for function calling
+# --------------------------
 record_user_details_json = {
     "name": "record_user_details",
     "description": "Use this tool to record that a user is interested in being in touch and provided an email address",
@@ -49,12 +65,13 @@ record_user_details_json = {
         "properties": {
             "email": {"type": "string", "description": "The email address of this user"},
             "name": {"type": "string", "description": "The user's name, if they provided it"},
-            "notes": {"type": "string", "description": "Context worth recording from the conversation"}
+            "notes": {"type": "string", "description": "Context worth recording from the conversation"},
         },
         "required": ["email"],
-        "additionalProperties": False
-    }
+        "additionalProperties": False,
+    },
 }
+
 record_unknown_question_json = {
     "name": "record_unknown_question",
     "description": "Use this tool to record a question that was asked but not answered",
@@ -62,11 +79,14 @@ record_unknown_question_json = {
         "type": "object",
         "properties": {"question": {"type": "string", "description": "The question that was asked"}},
         "required": ["question"],
-        "additionalProperties": False
-    }
+        "additionalProperties": False,
+    },
 }
-tools = [{"type": "function", "function": record_user_details_json},
-         {"type": "function", "function": record_unknown_question_json}]
+
+tools = [
+    {"type": "function", "function": record_user_details_json},
+    {"type": "function", "function": record_unknown_question_json},
+]
 
 def handle_tool_calls(tool_calls):
     results = []
@@ -79,7 +99,9 @@ def handle_tool_calls(tool_calls):
         results.append({"role": "tool", "content": json.dumps(result), "tool_call_id": tool_call.id})
     return results
 
-# --- Load optional local files safely ---
+# ----------------------------
+# Optional local content files
+# ----------------------------
 linkedin = ""
 pdf_path = Path("personal_info/linkedin_profile.pdf")
 if pdf_path.exists():
@@ -100,7 +122,9 @@ if summary_path.exists():
     except Exception as e:
         print(f"Summary read error: {e}")
 
-# --- Prompt ---
+# ----------------------------
+# System prompt
+# ----------------------------
 name = "Robert Morrow"
 system_prompt = (
     f"You are acting as {name}. You are answering questions on {name}'s website, "
@@ -126,20 +150,22 @@ system_prompt = (
     f"With this context, please chat with the user, always staying in character as {name}."
 )
 
-# --- Chat handler ---
+# ----------------------------
+# Chat handler
+# ----------------------------
 def chat(message, history):
     if not OPENAI_READY:
-        return "Server is not configured with OPENAI_API_KEY. Add it in Settings → Variables & secrets and restart this Space."
+        return "Server is not configured with OPENAI_API_KEY. Add it in Settings → Variables & secrets, then restart this Space."
 
     messages = [{"role": "system", "content": system_prompt}] + history + [{"role": "user", "content": message}]
     while True:
         try:
-            # instantiate client at call time; SDK reads OPENAI_API_KEY from env
+            # Instantiate client at call time; SDK reads OPENAI_API_KEY from env
             client = OpenAI()
             response = client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=messages,
-                tools=tools
+                tools=tools,
             )
         except Exception as e:
             return f"OpenAI error: {e}"
@@ -154,15 +180,16 @@ def chat(message, history):
         else:
             return choice.message.content
 
+# ----------------------------
+# UI: modern light with gradient frame & enhanced input row
+# ----------------------------
 
-
-
-# --- Palette ---
+# Palette
 G1 = "#2563EB"        # royal blue
 G2 = "#06B6D4"        # cyan
 TEXT_DARK = "#0F172A" # slate-900
 
-# Light, modern theme
+# Theme
 theme = gr.themes.Soft(
     primary_hue="indigo",
     secondary_hue="cyan",
@@ -171,14 +198,14 @@ theme = gr.themes.Soft(
     font_mono=[gr.themes.GoogleFont("Fira Code"), "ui-monospace"],
 )
 
-# Header
+# Header markup
 header_html = """
 <div class="hero">
   <div class="hero-left">
     <div class="hero-avatar"></div>
     <div class="hero-text">
-      <div class="hero-title">Chat with Robert</div>
-      <div class="hero-subtitle">We typically reply in a few minutes.</div>
+      <div class="hero-title">Chat with Robert's profile AI</div>
+      <div class="hero-subtitle">I can answer a lot of your questions.</div>
     </div>
   </div>
 </div>
@@ -251,45 +278,85 @@ body { background: #f3f6fb; }
   filter: saturate(1.05) contrast(1.03);
 }
 
-/* Inputs & buttons */
-#ci textarea, #ci input, #ci .gr-textbox {
-  border-radius: 12px !important;
-  border: 1px solid #dbe2ea !important;
+/* ===== Input row: clearer box + prominent send arrow ===== */
+
+/* Textbox shell */
+#ci .gr-textbox {
+  background: #f8fafc !important;                  /* light fill so it stands out */
+  border: 1.6px solid #cbd5e1 !important;           /* slightly thicker border */
+  border-radius: 14px !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.6);
 }
+
+/* Textarea itself */
+#ci .gr-textbox textarea {
+  padding: 14px 16px !important;
+  min-height: 56px !important;
+  line-height: 1.4 !important;
+  resize: none !important;
+  color: var(--text-dark) !important;
+}
+#ci .gr-textbox textarea::placeholder {
+  color: #64748b !important;                        /* slate-500 */
+  opacity: .95 !important;
+}
+
+/* Focus state: subtle two-ring glow using your palette */
+#ci .gr-textbox:focus-within {
+  border-color: transparent !important;
+  box-shadow:
+    0 0 0 2px rgba(37,99,235,.35),                  /* indigo ring */
+    0 0 0 5px rgba(6,182,212,.20),                  /* cyan outer ring */
+    inset 0 1px 0 rgba(255,255,255,.6) !important;
+}
+
+/* Layout: keep the input row tight */
+#ci .gr-form, #ci .gradio-row { gap: 10px; }
+
+/* Primary button = the arrow (circular, high-contrast chip) */
 #ci button.gr-button.primary {
+  width: 46px; min-width: 46px; height: 46px;       /* bigger target */
+  padding: 0 !important;
+  border-radius: 9999px !important;
   background: linear-gradient(135deg, var(--g1), var(--g2)) !important;
   border: 0 !important;
   color: #fff !important;
-  font-weight: 700;
-  border-radius: 12px !important;
-  box-shadow: 0 8px 18px rgba(37,99,235,.25);
+  box-shadow: 0 10px 22px rgba(37,99,235,.28);
+  display: inline-flex; align-items: center; justify-content: center;
 }
-#ci button.gr-button.primary:hover {
-  filter: brightness(1.06);
-  transform: translateY(-1px);
+
+/* Arrow icon inside the button */
+#ci button.gr-button.primary svg {
+  width: 22px; height: 22px;
+  color: #ffffff !important;
+  stroke: #ffffff !important; fill: #ffffff !important;
+  filter: drop-shadow(0 1px 1px rgba(0,0,0,.18));
 }
-#ci button.gr-button {
-  border-radius: 12px !important;
-}
+
+/* Hover/active states for tactile feel */
+#ci button.gr-button.primary:hover { filter: brightness(1.06); transform: translateY(-1px); }
+#ci button.gr-button.primary:active { transform: translateY(0); filter: brightness(0.98); }
+
+/* Secondary buttons keep rounded look, but stay subtle */
+#ci button.gr-button { border-radius: 12px !important; }
 
 /* Keep layout tidy on wide screens */
 .gradio-container { padding: 12px; }
 """)
 css = _css_tpl.substitute(G1=G1, G2=G2, TEXT_DARK=TEXT_DARK)
 
-# Chatbot (remove deprecated bubble_full_width)
+# Chatbot area
 chatbot = gr.Chatbot(
     type="messages",
     height=580,
     show_copy_button=True,
 )
 
-# Build the UI
+# Build the UI (Spaces will look for `demo`)
 with gr.Blocks(theme=theme, css=css) as demo:
     with gr.Group(elem_id="chat-shell"):
         with gr.Column(elem_id="chat-inner"):
             gr.HTML(header_html, elem_id="hero")
-            # Give the wrapper the elem_id so CSS can target it
             with gr.Group(elem_id="ci"):
                 gr.ChatInterface(
                     chat,
@@ -297,7 +364,6 @@ with gr.Blocks(theme=theme, css=css) as demo:
                     title=None,
                     description=None,
                 )
-
 
 if __name__ == "__main__":
     demo.launch()
