@@ -325,8 +325,11 @@ _css_tpl = Template(r"""
   --badge-color: $BADGE_COLOR;
   --badge-shadow: $BADGE_SHADOW;
 
-  /* Force readable defaults for text variables some themes rely on */
-  --body-text-color: var(--text-dark);
+  /* Keep the page in light mode (prevents some mobile auto-darking) */
+  color-scheme: light;
+
+  /* Shared var for chat area background */
+  --chat-bg: #ffffff;
 }
 html, body { background: #f3f6fb; color: var(--text-dark); }
 
@@ -340,7 +343,7 @@ html, body { background: #f3f6fb; color: var(--text-dark); }
   box-shadow: 0 20px 50px rgba(2, 6, 23, 0.14);
 }
 #chat-inner {
-  background: #ffffff;
+  background: var(--chat-bg) !important;
   border-radius: 16px;
   overflow: hidden;
 }
@@ -363,8 +366,8 @@ html, body { background: #f3f6fb; color: var(--text-dark); }
 .hero-subtitle { opacity: .9; font-size: 13px; }
 .hero-badge {
   position: absolute;
-  top: 5px;                                  /* 5px from the top edge */
-  right: 5px;                                /* 5px from the right edge */
+  top: 5px;
+  right: 5px;
   z-index: 1;
 
   font-size: 12px; font-weight: 700; letter-spacing: .2px;
@@ -376,25 +379,32 @@ html, body { background: #f3f6fb; color: var(--text-dark); }
 
 /* Ensure wrapper uses dark text by default */
 #ci {
-  background: #fff;
+  background: var(--chat-bg) !important;
   border-radius: 0 0 16px 16px;
   padding: 8px 10px 12px;
   color: var(--text-dark);
 }
 
-/* Chat area */
-#ci .gr-chatbot, #ci .chatbot { background:#ffffff; }
+/* Chat area — force light backgrounds even on mobile dark mode */
+#ci .gr-chatbot,
+#ci .chatbot,
+#ci .gr-chatbot > div,
+#ci .chatbot > div,
+#ci .gr-box,
+#ci .gr-panel {
+  background: var(--chat-bg) !important;
+}
 
-/* ---- MOBILE SAFETY: Always force readable colors for bot messages ---- */
+/* ---- Always readable colors for bot messages ---- */
 #ci .message.bot {
   background: #eef2f7 !important;     /* soft light bubble */
   color: var(--text-dark) !important;
   border: 1px solid #e5e7eb !important;
   border-radius: 14px !important;
 }
-#ci .message.bot *,                     /* children inherit readable color */
+#ci .message.bot *,
 #ci .message.bot .prose,
-#ci .message.bot .prose * ,
+#ci .message.bot .prose *,
 #ci .message.bot .markdown-body,
 #ci .message.bot .markdown-body * {
   color: var(--text-dark) !important;
@@ -423,14 +433,12 @@ html, body { background: #f3f6fb; color: var(--text-dark); }
 }
 
 /* ===== Input row: clearer box + prominent send arrow ===== */
-/* Textbox shell */
 #ci .gr-textbox {
-  background: #f8fafc !important;                  /* light fill so it stands out */
-  border: 1.6px solid #cbd5e1 !important;           /* slightly thicker border */
+  background: #f8fafc !important;
+  border: 1.6px solid #cbd5e1 !important;
   border-radius: 14px !important;
   box-shadow: inset 0 1px 0 rgba(255,255,255,.6);
 }
-/* Textarea itself */
 #ci .gr-textbox textarea {
   padding: 14px 16px !important;
   min-height: 56px !important;
@@ -439,23 +447,19 @@ html, body { background: #f3f6fb; color: var(--text-dark); }
   color: var(--text-dark) !important;
 }
 #ci .gr-textbox textarea::placeholder {
-  color: #64748b !important;                        /* slate-500 */
+  color: #64748b !important;
   opacity: .95 !important;
 }
-/* Focus state: subtle two-ring glow using your palette */
 #ci .gr-textbox:focus-within {
   border-color: transparent !important;
   box-shadow:
-    0 0 0 2px rgba(37,99,235,.35),                  /* indigo ring */
-    0 0 0 5px rgba(6,182,212,.20),                  /* cyan outer ring */
+    0 0 0 2px rgba(37,99,235,.35),
+    0 0 0 5px rgba(6,182,212,.20),
     inset 0 1px 0 rgba(255,255,255,.6) !important;
 }
-/* Layout: keep the input row tight */
 #ci .gr-form, #ci .gradio-row { gap: 10px; }
-
-/* Primary button = the arrow (circular, high-contrast chip) */
 #ci button.gr-button.primary {
-  width: 46px; min-width: 46px; height: 46px;       /* bigger target */
+  width: 46px; min-width: 46px; height: 46px;
   padding: 0 !important;
   border-radius: 9999px !important;
   background: linear-gradient(135deg, var(--g1), var(--g2)) !important;
@@ -464,26 +468,29 @@ html, body { background: #f3f6fb; color: var(--text-dark); }
   box-shadow: 0 10px 22px rgba(37,99,235,.28);
   display: inline-flex; align-items: center; justify-content: center;
 }
-/* Arrow icon inside the button */
 #ci button.gr-button.primary svg {
   width: 22px; height: 22px;
   color: #ffffff !important;
   stroke: #ffffff !important; fill: #ffffff !important;
   filter: drop-shadow(0 1px 1px rgba(0,0,0,.18));
 }
-/* Hover/active states for tactile feel */
 #ci button.gr-button.primary:hover { filter: brightness(1.06); transform: translateY(-1px); }
 #ci button.gr-button.primary:active { transform: translateY(0); filter: brightness(0.98); }
-
-/* Secondary buttons keep rounded look, but stay subtle */
 #ci button.gr-button { border-radius: 12px !important; }
 
-/* ---- Defensive overrides for devices that auto-apply dark mode ---- */
+/* ---- Defensive overrides for devices that auto-apply dark mode or invert colors ---- */
 @media (prefers-color-scheme: dark) {
-  #ci, #ci * { color: var(--text-dark) !important; }
+  html, body { background: #f3f6fb !important; color: var(--text-dark) !important; }
+  #chat-inner, #ci, #ci .gr-chatbot, #ci .chatbot, #ci .gr-box, #ci .gr-panel, .gradio-container {
+    background: var(--chat-bg) !important;
+  }
   #ci .message.bot { background: #e5e7eb !important; }
   #ci .message.bot *, #ci .gr-markdown * { color: var(--text-dark) !important; }
-  html, body { background: #f3f6fb !important; }
+}
+
+/* Extra safety on narrow/mobile viewports */
+@media screen and (max-width: 480px) {
+  #chat-inner, #ci, #ci .gr-chatbot, #ci .chatbot { background: var(--chat-bg) !important; }
 }
 
 /* Keep layout tidy on wide screens */
