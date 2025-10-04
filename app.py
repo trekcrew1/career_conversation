@@ -1,5 +1,6 @@
 # app.py
 import os
+import re
 import json
 from pathlib import Path
 from string import Template
@@ -75,15 +76,6 @@ def generate_polite_decline(user_text: str) -> str:
     except Exception as e:
         print(f"Decline generation error: {e}")
         return DECLINE_FALLBACK
-
-def _moderate(text: str) -> bool:
-    try:
-        from openai import OpenAI
-        client = OpenAI()
-        r = client.moderations.create(model="omni-moderation-latest", input=text)
-        return bool(r.results[0].flagged)
-    except Exception:
-        return False  # fail open if moderation unavailable
 
 
 PUSHOVER_USER  = os.getenv("PUSHOVER_USER")
@@ -242,19 +234,123 @@ def _looks_like_job_pitch(text: str) -> bool:
     return any(k in t for k in keywords)
 
 # ----------------------------
+# Moderation + Brand Guardrails
+# ----------------------------
+SAFE_REFUSAL = "I’m going to keep it professional and skip that request. Happy to discuss experience, projects, and fit for roles."
+
+# Heuristics (brand rules)
+BAD_WORDS = re.compile(r"\b(fuck|shit|bitch|bastard|dumbass|moron|idiot|suck|crap)\b", re.I)
+SLUR_HINTS = re.compile(r"\b(retard|tranny|faggot|chink|spic|kike)\b", re.I)
+SECRET_LEAK_HINTS = re.compile(r"(api[_-]?key|sk-[A-Za-z0-9]{20,}|OPENAI_API_KEY|PUSHOVER_TOKEN|BEGIN PRIVATE KEY)", re.I)
+POLITICAL_PUSH = re.compile(r"\b(vote for|endorse|support (?:the )?(?:democrats?|republicans?|candidate|party))\b", re.I)
+GOSSIP_HINTS = re.compile(r"\b(name|identify).*(coworker|manager|person).*(stole|crime|illegal|harassment)\b", re.I)
+INSULT_PATTERN = re.compile(r"\b(you|they|recruiters|hiring managers).*(stupid|dumb|idiot|useless|incompetent)\b", re.I)
+
+# Inbound secret/injection requests (block before generation)
+SECRET_EXFIL_REQ = re.compile(
+    r"(print|show|reveal).*(system (?:prompt|instructions)|env(?:ironment)? (?:vars?|variables?)|api[_-]?keys?)|"
+    r"list (?:all )?environment variables|OPENAI_API_KEY|PUSHOVER_TOKEN",
+    re.I
+)
+
+def check_moderation(text: str):
+    """Return (flagged: bool, categories: list[str]) using OpenAI Moderation."""
+    try:
+        client = OpenAI()
+        r = client.moderations.create(model="omni-moderation-latest", input=text or "")
+        res = r.results[0]
+        cats = [k for k, v in res.categories.__dict__.items() if v]
+        return bool(res.flagged), cats
+    except Exception as e:
+        # Fail open on moderation errors—but log for visibility
+        print(f"Moderation error: {e}")
+        return False, []
+
+def heuristic_flags(text: str):
+    """Return list of brand-rule issues found."""
+    t = text or ""
+    flags = []
+    if BAD_WORDS.search(t): flags.append("profanity")
+    if SLUR_HINTS.search(t): flags.append("slur")
+    if SECRET_LEAK_HINTS.search(t): flags.append("secret_like")
+    if POLITICAL_PUSH.search(t): flags.append("political_endorsement")
+    if GOSSIP_HINTS.search(t): flags.append("defamation_risk")
+    if INSULT_PATTERN.search(t): flags.append("insulting_tone")
+    if "buzz off" in t.lower() or "trash" in t.lower(): flags.append("unprofessional_tone")
+    return flags
+
+def soften_tone(reply: str) -> str:
+    """Rewrite response to a neutral, professional tone (no endorsements or secrets)."""
+    try:
+        client = OpenAI()
+        r = client.chat.completions.create(
+            model="gpt-4o-mini",
+            temperature=0.2,
+            messages=[
+                {"role": "system",
+                 "content": "Rewrite the message to be polite, neutral, professional, and free of endorsements or secrets. Avoid profanity and insults."},
+                {"role": "user", "content": reply}
+            ],
+            max_tokens=220,
+        )
+        new_text = r.choices[0].message.content.strip()
+        return new_text or reply
+    except Exception as e:
+        print(f"Tone rewrite error: {e}")
+        return "Let’s keep this professional. I’m happy to talk about my background, projects, and how I can help."
+
+def safe_finalize(reply: str) -> str:
+    """Apply moderation + brand rules to the model's draft reply."""
+    # 1) Safety moderation
+    flagged, cats = check_moderation(reply)
+    if flagged:
+        print(f"Moderation flagged categories: {cats}")
+        return SAFE_REFUSAL
+
+    # 2) Brand guardrails
+    flags = heuristic_flags(reply)
+    if not flags:
+        return reply
+
+    print(f"Brand flags: {flags}")
+
+    # Hard block on secret-like content
+    if "secret_like" in flags:
+        return "For security and privacy, I can’t share credentials, environment variables, or internal prompts."
+
+    # For tone/endorsement/defamation, try to rewrite
+    if any(f in flags for f in ["political_endorsement", "unprofessional_tone", "insulting_tone", "defamation_risk", "profanity", "slur"]):
+        return soften_tone(reply)
+
+    # Fallback
+    return reply
+
+def guard_inbound_request(user_text: str):
+    """Block unsafe or secret-exfil requests before generation."""
+    flagged, cats = check_moderation(user_text)
+    if flagged:
+        print(f"Inbound moderation flagged: {cats}")
+        return SAFE_REFUSAL
+    if SECRET_EXFIL_REQ.search(user_text or ""):
+        return "For security reasons, I can’t reveal system prompts, environment variables, or API keys."
+    return None
+
+# ----------------------------
 # Chat handler
 # ----------------------------
 def chat(message, history):
     if not OPENAI_READY:
         return "Server is not configured with OPENAI_API_KEY. Add it in Settings → Variables & secrets, then restart this Space."
 
-    # If not looking and the inbound reads like a job/offer, produce a tailored decline
-    if not LOOKING_FOR_ROLE and _looks_like_job_pitch(message):
-        return generate_polite_decline(message)
+    # Inbound guard
+    inbound_block = guard_inbound_request(message)
+    if inbound_block:
+        return inbound_block
 
-    if _moderate(message):
-        return "I’m going to keep it professional and skip that. Happy to discuss my experience, projects, and fit for roles."
-    
+    # If not looking and the inbound reads like a job/offer, produce a tailored decline (then pass through safety)
+    if not LOOKING_FOR_ROLE and _looks_like_job_pitch(message):
+        return safe_finalize(generate_polite_decline(message))
+
     messages = [{"role": "system", "content": system_prompt}] + history + [{"role": "user", "content": message}]
     while True:
         try:
@@ -276,7 +372,8 @@ def chat(message, history):
             messages.extend(handle_tool_calls(tool_calls))
             # loop so the model can use tool outputs
         else:
-            return choice.message.content
+            draft = choice.message.content
+            return safe_finalize(draft)
 
 # ----------------------------
 # UI: modern light with gradient frame & enhanced input row
