@@ -324,7 +324,10 @@ header_html = f"""
     <div class="hero-avatar"></div>
     <div class="hero-text">
       <div class="hero-title">Chat with Robert's profile AI</div>
-      <div class="hero-subtitle">I can answer a lot of your questions.</div>
+      <div class="notice">
+        <span class="dot"></span>
+        <span class="text"><i>I’m an AI version of Robert. I’m still learning and may be wrong sometimes—please verify important info.</i></span>
+      </div>
     </div>
   </div>
 
@@ -378,7 +381,7 @@ body { background: #f3f6fb; }
 .hero-subtitle { opacity: .9; font-size: 13px; }
 .hero-badge {
   position: absolute;
-  top: 5px;                                  /* 5px from the top edge */
+  top: 10px;                                  /* 5px from the top edge */
   right: 5px;                                /* 5px from the right edge */
   z-index: 1;
 
