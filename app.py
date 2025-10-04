@@ -31,7 +31,7 @@ def _get_bool(name: str, default: bool = True) -> bool:
         return default
     return str(raw).strip().lower() in {"1", "true", "yes", "y", "on"}
 
-LOOKING_FOR_ROLE = _get_bool("LOOKING_FOR_ROLE", True)
+LOOKING_FOR_ROLE = _get_bool("LOOKING_FOR_ROLE", False)
 
 PUSHOVER_USER  = os.getenv("PUSHOVER_USER")
 PUSHOVER_TOKEN = os.getenv("PUSHOVER_TOKEN")
