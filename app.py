@@ -472,14 +472,16 @@ def chat(message, history):
     if inbound_block:
         return inbound_block
 
-    # Job/offer handling (safe in both modes)
-    if _looks_like_job_pitch(message):
-        reply = generate_polite_interest(message) if LOOKING_FOR_ROLE else generate_polite_decline(message)
-        return safe_finalize(reply)
-
+    # If not looking and the inbound reads like a job/offer, produce a tailored decline
+    if not LOOKING_FOR_ROLE and _looks_like_job_pitch(message):
+        return generate_polite_decline(message)    
+    
     # Education queries: deterministic, no LLM
     if _looks_like_education(message):
         return _education_markdown()
+    
+    # Sanitize message before sending to OpenAI.
+    message = safe_finalize(message)    
 
     # LLM path
     messages = [{"role": "system", "content": system_prompt}] + history + [{"role": "user", "content": message}]
