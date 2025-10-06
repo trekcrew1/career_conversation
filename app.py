@@ -349,10 +349,19 @@ system_prompt = (
     "When asked about Education, prefer this curated section over inference; if something is not in the list, say you’re not certain."
 )
 
+# def _looks_like_job_pitch(text: str) -> bool:
+#     t = (text or "").lower()
+#     keywords = (
+#         "job", "position", "role", "opportunity", "opening",
+#         "hire", "hiring", "recruit", "recruiter", "headcount",
+#         "interview", "join our", "work with us", "offer"
+#     )
+#     return any(k in t for k in keywords)
+
 def _looks_like_job_pitch(text: str) -> bool:
     t = (text or "").lower()
     keywords = (
-        "job", "position", "role", "opportunity", "opening",
+        "opportunity", "opening",
         "hire", "hiring", "recruit", "recruiter", "headcount",
         "interview", "join our", "work with us", "offer"
     )
