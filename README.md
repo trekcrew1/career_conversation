@@ -30,6 +30,15 @@ The bot uses GPT-4o-mini to have natural conversations while staying grounded in
 - ✅ **Function calling** - Records user contact details and unanswered questions
 - ✅ **Beautiful UI** - Gradient-styled chat interface with availability badges
 
+## See It In Action
+
+Want to see what this looks like? Check out my live career bot:
+
+- **🤖 Chat with my AI:** [https://huggingface.co/spaces/4robmorrow/career-conversation](https://huggingface.co/spaces/4robmorrow/career-conversation)
+- **👔 My LinkedIn Profile:** [https://www.linkedin.com/in/robert-morrow-5408a08/](https://www.linkedin.com/in/robert-morrow-5408a08/)
+
+Try asking about my experience, skills, or current projects - the AI will answer based on my professional summary and background!
+
 ## Quick Start: Deploy Your Own Bot
 
 ### Prerequisites
